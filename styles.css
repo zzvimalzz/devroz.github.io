@@ -282,8 +282,8 @@ h1 {
 
 @media (max-width: 768px) {
     body {
-        align-items: flex-start;
-        padding-top: 15vh;
+        align-items: center;
+        padding-top: 0;
     }
 
     h1 {
