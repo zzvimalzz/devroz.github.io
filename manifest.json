@@ -1,0 +1,17 @@
+{
+  "name": "Devroz",
+  "short_name": "Devroz",
+  "description": "Developing Transformative Technology - Fintech Solutions",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#5ee7df",
+  "icons": [
+    {
+      "src": "assets/images/devroz_logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
