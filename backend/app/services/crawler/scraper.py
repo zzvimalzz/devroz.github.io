@@ -24,8 +24,7 @@ import aiohttp
 from playwright.async_api import async_playwright, Page, Browser
 
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Get logger - let the application configure logging
 logger = logging.getLogger(__name__)
 
 
@@ -127,6 +126,9 @@ class WebCrawler:
         "data-href", "data-url", "data-link", "data-src",
         "data-page", "data-target", "data-action", "data-route"
     ]
+    
+    # Pre-compiled regex for URL pattern matching
+    URL_PATH_PATTERN = re.compile(r"^[\w\-/]+\.?(html?|php|aspx?|jsp)?$")
     
     def __init__(self, config: Optional[CrawlConfig] = None):
         """Initialize the crawler with configuration."""
@@ -719,15 +721,19 @@ class WebCrawler:
         urls: Set[str] = set()
         
         try:
-            # Get all stylesheets
+            # Get all stylesheets with rule count limit for performance
             result = await page.evaluate("""
                 () => {
                     const urls = [];
                     const sheets = document.styleSheets;
-                    for (let i = 0; i < sheets.length; i++) {
+                    const MAX_RULES = 1000;  // Limit to prevent performance issues
+                    let ruleCount = 0;
+                    
+                    for (let i = 0; i < sheets.length && ruleCount < MAX_RULES; i++) {
                         try {
                             const rules = sheets[i].cssRules || sheets[i].rules;
-                            for (let j = 0; j < rules.length; j++) {
+                            for (let j = 0; j < rules.length && ruleCount < MAX_RULES; j++) {
+                                ruleCount++;
                                 const rule = rules[j];
                                 if (rule.style && rule.style.backgroundImage) {
                                     const matches = rule.style.backgroundImage.match(/url\\(['"]?([^'")]+)['"]?\\)/g);
@@ -799,9 +805,12 @@ class WebCrawler:
         
         try:
             # Try to extract routes from common SPA frameworks
+            # Content length limit to prevent performance issues on large bundles
             result = await page.evaluate("""
                 () => {
                     const routes = [];
+                    const MAX_SCRIPT_LENGTH = 100000;  // 100KB limit per script
+                    const MAX_SCRIPTS = 50;  // Limit number of scripts to parse
                     
                     // Check for React Router
                     if (window.__REACT_ROUTER_STATE__) {
@@ -831,9 +840,18 @@ class WebCrawler:
                     }
                     
                     // Look for href in internal links within script tags
+                    // with limits to prevent performance issues
                     const scripts = document.querySelectorAll('script');
+                    let scriptCount = 0;
+                    
                     scripts.forEach(script => {
+                        if (scriptCount >= MAX_SCRIPTS) return;
+                        scriptCount++;
+                        
                         const content = script.textContent || '';
+                        // Skip large scripts to prevent performance issues
+                        if (content.length > MAX_SCRIPT_LENGTH) return;
+                        
                         const matches = content.match(/["']\\/([\\/\\w-]+)["']/g);
                         if (matches) {
                             matches.forEach(m => {
@@ -871,8 +889,8 @@ class WebCrawler:
         if value.startswith(("/", "http://", "https://", "./")):
             return True
             
-        # Check for path-like patterns
-        if re.match(r"^[\w\-/]+\.?(html?|php|aspx?|jsp)?$", value):
+        # Check for path-like patterns using pre-compiled regex
+        if self.URL_PATH_PATTERN.match(value):
             return True
             
         return False
